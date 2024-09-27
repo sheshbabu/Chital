@@ -1,59 +1,125 @@
-//
-//  ContentView.swift
-//  Chital
-//
-//  Created by Sheshbabu Chinnakonda on 27/9/24.
-//
-
 import SwiftUI
 import SwiftData
 
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
-
+    @Environment(\.modelContext) private var context
+    @Query(sort: \ChatThread.createdAt, order: .reverse) private var threads: [ChatThread]
+    
+    @State private var selectedThreadId: ChatThread.ID?
+    @State private var draftThread: ChatThread?
+    
+    @State private var availableModels: [String] = []
+    @State private var isLoadingModels = true
+    
+    @State private var errorMessage: String?
+    @State private var shouldShowErrorAlert = false
+    
     var body: some View {
         NavigationSplitView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                    } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
-                    }
+            List(threads, selection: $selectedThreadId) { thread in
+                NavigationLink(value: thread.id) {
+                    Text(thread.title)
+                        .contextMenu {
+                            Button(action: { deleteThread(thread) }) {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
                 }
-                .onDelete(perform: deleteItems)
             }
             .navigationSplitViewColumnWidth(min: 180, ideal: 200)
             .toolbar {
                 ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
+                    Button(action: startNewThread) {
+                        Label("New Thread", systemImage: "plus")
                     }
                 }
             }
         } detail: {
-            Text("Select an item")
+            if isLoadingModels {
+                ProgressView("Loading models...")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                let selectedThread = threads.first(where: { $0.id == selectedThreadId })
+                let threadToDisplay = selectedThread ?? draftThread ?? createNewThread()
+                let isDraft = selectedThread == nil
+                
+                ChatThreadView(
+                    thread: threadToDisplay,
+                    isDraft: .constant(isDraft),
+                    availableModels: availableModels
+                )
+                .navigationTitle(Text(threadToDisplay.title))
+            }
         }
-    }
-
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
+        .task {
+            await fetchAvailableModels()
+            if draftThread == nil {
+                draftThread = createNewThread()
+            }
         }
+        .alert("Error", isPresented: $shouldShowErrorAlert, actions: {
+            Button("OK") {
+                errorMessage = nil
+            }
+        }, message: {
+            Text(errorMessage ?? "An unknown error occurred.")
+        })
     }
-
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(items[index])
+    
+    private func createNewThread() -> ChatThread {
+        return ChatThread(timestamp: Date(), title: "New Conversation", selectedModel: availableModels.first)
+    }
+    
+    private func startNewThread() {
+        let newThread = createNewThread()
+        context.insert(newThread)
+        Task {
+            await MainActor.run {
+                selectedThreadId = newThread.id
             }
         }
     }
-}
-
-#Preview {
-    ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
+    
+    private func deleteThread(_ thread: ChatThread) {
+        context.delete(thread)
+        if selectedThreadId == thread.id {
+            selectedThreadId = threads.first?.id
+        }
+    }
+    
+    private func fetchAvailableModels() async {
+        let ollamaService = OllamaService()
+        
+        do {
+            let modelNames = try await ollamaService.fetchModelList()
+            await MainActor.run {
+                availableModels = modelNames
+                isLoadingModels = false
+            }
+        } catch {
+            await handleError(error)
+        }
+    }
+    
+    private func handleError(_ error: Error) async {
+        await MainActor.run {
+            shouldShowErrorAlert = true
+            
+            let networkError = error as? URLError
+            let defaultErrorMessage = "An unexpected error occurred while communicating with the Ollama API: \(error.localizedDescription)"
+            
+            if networkError == nil {
+                errorMessage = defaultErrorMessage
+            } else {
+                switch networkError?.code {
+                case .cannotConnectToHost:
+                    errorMessage = "Unable to connect to the Ollama API. Please ensure that the Ollama server is running."
+                case .timedOut:
+                    errorMessage = "The request to Ollama API timed out. Please try again later."
+                default:
+                    errorMessage = defaultErrorMessage
+                }
+            }
+        }
+    }
 }

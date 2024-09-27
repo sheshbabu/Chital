@@ -1,32 +1,30 @@
-//
-//  ChitalApp.swift
-//  Chital
-//
-//  Created by Sheshbabu Chinnakonda on 27/9/24.
-//
-
 import SwiftUI
 import SwiftData
 
 @main
 struct ChitalApp: App {
-    var sharedModelContainer: ModelContainer = {
+    var container: ModelContainer = {
         let schema = Schema([
-            Item.self,
+            ChatThread.self,
+            ChatMessage.self
         ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-
+        let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        
         do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
+            return try ModelContainer(for: schema, configurations: [configuration])
         } catch {
             fatalError("Could not create ModelContainer: \(error)")
         }
     }()
-
+    
     var body: some Scene {
         WindowGroup {
             ContentView()
         }
-        .modelContainer(sharedModelContainer)
+        .modelContainer(container)
+        
+        Settings {
+            SettingsView()
+        }
     }
 }

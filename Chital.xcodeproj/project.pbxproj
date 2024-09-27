@@ -8,20 +8,33 @@
 
 /* Begin PBXBuildFile section */
 		85156A3E2CA6BFD20061ED78 /* ChitalApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85156A3D2CA6BFD20061ED78 /* ChitalApp.swift */; };
-		85156A402CA6BFD20061ED78 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85156A3F2CA6BFD20061ED78 /* ContentView.swift */; };
-		85156A422CA6BFD20061ED78 /* Item.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85156A412CA6BFD20061ED78 /* Item.swift */; };
 		85156A442CA6BFD30061ED78 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 85156A432CA6BFD30061ED78 /* Assets.xcassets */; };
 		85156A472CA6BFD30061ED78 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 85156A462CA6BFD30061ED78 /* Preview Assets.xcassets */; };
+		85156A562CA6C0210061ED78 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85156A4E2CA6C0210061ED78 /* ContentView.swift */; };
+		85156A572CA6C0210061ED78 /* ChatBubbleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85156A4F2CA6C0210061ED78 /* ChatBubbleView.swift */; };
+		85156A582CA6C0210061ED78 /* AppConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85156A502CA6C0210061ED78 /* AppConstants.swift */; };
+		85156A592CA6C0210061ED78 /* OllamaService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85156A512CA6C0210061ED78 /* OllamaService.swift */; };
+		85156A5A2CA6C0210061ED78 /* ChatInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85156A522CA6C0210061ED78 /* ChatInputView.swift */; };
+		85156A5B2CA6C0210061ED78 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85156A532CA6C0210061ED78 /* SettingsView.swift */; };
+		85156A5C2CA6C0210061ED78 /* ChatModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85156A542CA6C0210061ED78 /* ChatModels.swift */; };
+		85156A5D2CA6C0210061ED78 /* ChatThreadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85156A552CA6C0210061ED78 /* ChatThreadView.swift */; };
+		85156A602CA6C0E80061ED78 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = 85156A5F2CA6C0E80061ED78 /* MarkdownUI */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		85156A3A2CA6BFD20061ED78 /* Chital.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Chital.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		85156A3D2CA6BFD20061ED78 /* ChitalApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChitalApp.swift; sourceTree = "<group>"; };
-		85156A3F2CA6BFD20061ED78 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		85156A412CA6BFD20061ED78 /* Item.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Item.swift; sourceTree = "<group>"; };
 		85156A432CA6BFD30061ED78 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		85156A462CA6BFD30061ED78 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		85156A482CA6BFD30061ED78 /* Chital.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Chital.entitlements; sourceTree = "<group>"; };
+		85156A4E2CA6C0210061ED78 /* ContentView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		85156A4F2CA6C0210061ED78 /* ChatBubbleView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChatBubbleView.swift; sourceTree = "<group>"; };
+		85156A502CA6C0210061ED78 /* AppConstants.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppConstants.swift; sourceTree = "<group>"; };
+		85156A512CA6C0210061ED78 /* OllamaService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OllamaService.swift; sourceTree = "<group>"; };
+		85156A522CA6C0210061ED78 /* ChatInputView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChatInputView.swift; sourceTree = "<group>"; };
+		85156A532CA6C0210061ED78 /* SettingsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		85156A542CA6C0210061ED78 /* ChatModels.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChatModels.swift; sourceTree = "<group>"; };
+		85156A552CA6C0210061ED78 /* ChatThreadView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChatThreadView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -29,6 +42,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				85156A602CA6C0E80061ED78 /* MarkdownUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -55,8 +69,14 @@
 			isa = PBXGroup;
 			children = (
 				85156A3D2CA6BFD20061ED78 /* ChitalApp.swift */,
-				85156A3F2CA6BFD20061ED78 /* ContentView.swift */,
-				85156A412CA6BFD20061ED78 /* Item.swift */,
+				85156A502CA6C0210061ED78 /* AppConstants.swift */,
+				85156A4F2CA6C0210061ED78 /* ChatBubbleView.swift */,
+				85156A522CA6C0210061ED78 /* ChatInputView.swift */,
+				85156A542CA6C0210061ED78 /* ChatModels.swift */,
+				85156A552CA6C0210061ED78 /* ChatThreadView.swift */,
+				85156A4E2CA6C0210061ED78 /* ContentView.swift */,
+				85156A512CA6C0210061ED78 /* OllamaService.swift */,
+				85156A532CA6C0210061ED78 /* SettingsView.swift */,
 				85156A432CA6BFD30061ED78 /* Assets.xcassets */,
 				85156A482CA6BFD30061ED78 /* Chital.entitlements */,
 				85156A452CA6BFD30061ED78 /* Preview Content */,
@@ -88,6 +108,9 @@
 			dependencies = (
 			);
 			name = Chital;
+			packageProductDependencies = (
+				85156A5F2CA6C0E80061ED78 /* MarkdownUI */,
+			);
 			productName = Chital;
 			productReference = 85156A3A2CA6BFD20061ED78 /* Chital.app */;
 			productType = "com.apple.product-type.application";
@@ -116,6 +139,9 @@
 				Base,
 			);
 			mainGroup = 85156A312CA6BFD20061ED78;
+			packageReferences = (
+				85156A5E2CA6C0E70061ED78 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */,
+			);
 			productRefGroup = 85156A3B2CA6BFD20061ED78 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -142,9 +168,15 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				85156A402CA6BFD20061ED78 /* ContentView.swift in Sources */,
-				85156A422CA6BFD20061ED78 /* Item.swift in Sources */,
+				85156A5B2CA6C0210061ED78 /* SettingsView.swift in Sources */,
+				85156A572CA6C0210061ED78 /* ChatBubbleView.swift in Sources */,
+				85156A5A2CA6C0210061ED78 /* ChatInputView.swift in Sources */,
+				85156A5D2CA6C0210061ED78 /* ChatThreadView.swift in Sources */,
+				85156A592CA6C0210061ED78 /* OllamaService.swift in Sources */,
+				85156A562CA6C0210061ED78 /* ContentView.swift in Sources */,
 				85156A3E2CA6BFD20061ED78 /* ChitalApp.swift in Sources */,
+				85156A582CA6C0210061ED78 /* AppConstants.swift in Sources */,
+				85156A5C2CA6C0210061ED78 /* ChatModels.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -283,6 +315,8 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Chital;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -311,6 +345,8 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Chital;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -347,6 +383,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		85156A5E2CA6C0E70061ED78 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/gonzalezreal/swift-markdown-ui";
+			requirement = {
+				kind = exactVersion;
+				version = 2.4.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		85156A5F2CA6C0E80061ED78 /* MarkdownUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 85156A5E2CA6C0E70061ED78 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */;
+			productName = MarkdownUI;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 85156A322CA6BFD20061ED78 /* Project object */;
 }
