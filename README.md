@@ -16,7 +16,7 @@ https://github.com/user-attachments/assets/14eddab2-87c3-4dd5-b26a-a58e2f12f76a
 ## Requirements
 * macOS 14 Sonoma and above
 * Ensure [Ollama](https://ollama.com) is installed 
-* Ensure atleast one LLM [model](https://ollama.com/library) is downloaded
+* Ensure at least one LLM [model](https://ollama.com/library) is downloaded
 
 ## Installation
 * Download [Chital](https://github.com/sheshbabu/Chital/releases)
