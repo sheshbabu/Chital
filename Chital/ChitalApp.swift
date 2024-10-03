@@ -22,6 +22,9 @@ struct ChitalApp: App {
             ContentView()
         }
         .modelContainer(container)
+        .commands {
+            CommandGroup(replacing: .saveItem) {}
+        }
         
         Settings {
             SettingsView()
