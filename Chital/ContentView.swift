@@ -32,6 +32,7 @@ struct ContentView: View {
                     Button(action: startNewThread) {
                         Label("New Thread", systemImage: "plus")
                     }
+                    .keyboardShortcut("n", modifiers: .command)
                 }
             }
         } detail: {
@@ -73,10 +74,8 @@ struct ContentView: View {
     private func startNewThread() {
         let newThread = createNewThread()
         context.insert(newThread)
-        Task {
-            await MainActor.run {
-                selectedThreadId = newThread.id
-            }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            selectedThreadId = newThread.id
         }
     }
     
