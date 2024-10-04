@@ -25,8 +25,9 @@ struct ChatInputView: View {
             }
             .padding(.trailing)
             HStack {
-                TextField(isThinking ? "Thinking..." : "How can I help you today?", text: $currentInputMessage)
+                TextField(isThinking ? "Thinking..." : "How can I help you today?", text: $currentInputMessage, axis: .vertical)
                     .textFieldStyle(PlainTextFieldStyle())
+                    .lineLimit(10)
                     .padding(.horizontal, 15)
                     .padding(.vertical, 8)
                     .background(Color(NSColor.controlBackgroundColor))
@@ -42,4 +43,29 @@ struct ChatInputView: View {
             .padding(.horizontal)
         }
     }
+}
+
+#Preview {
+    struct PreviewWrapper: View {
+        @State private var currentInputMessage = ""
+        @State private var selectedModel = "llama3.1"
+        @FocusState private var isTextFieldFocused: Bool
+        let modelOptions = ["llama3.1", "llama3.2"]
+        
+        var body: some View {
+            ChatInputView(
+                currentInputMessage: $currentInputMessage,
+                isTextFieldFocused: _isTextFieldFocused,
+                isThinking: false,
+                onSubmit: {},
+                selectedModel: $selectedModel,
+                modelOptions: modelOptions
+            )
+            .frame(height: 100)
+            .padding()
+            .onAppear { isTextFieldFocused = true }
+        }
+    }
+    
+    return PreviewWrapper()
 }
