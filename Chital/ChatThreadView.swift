@@ -22,7 +22,7 @@ struct ChatThreadView: View {
         VStack {
             ScrollViewReader { proxy in
                 ScrollView(.vertical) {
-                    LazyVStack(alignment: .leading, spacing: 24) {
+                    VStack(alignment: .leading, spacing: 24) {
                         ForEach(chronologicalMessages) { message in
                             ChatBubbleView(message: message)
                                 .id(message.id)
