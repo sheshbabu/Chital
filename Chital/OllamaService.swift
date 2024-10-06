@@ -6,10 +6,15 @@ struct OllamaChatMessage: Codable {
     let content: String
 }
 
+struct OllamaChatRequestOptions: Codable {
+    let num_ctx: Int
+}
+
 struct OllamaChatRequest: Codable {
     let model: String
     let messages: [OllamaChatMessage]
     let stream: Bool?
+    let options: OllamaChatRequestOptions?
 }
 
 struct OllamaChatResponse: Codable {
@@ -27,6 +32,7 @@ struct OllamaModel: Codable {
 
 class OllamaService {
     @AppStorage("ollamaBaseURL") private var baseURLString = AppConstants.ollamaDefaultBaseURL
+    @AppStorage("contextWindowLength") private var contextWindowLength = AppConstants.contextWindowLength
     
     private var baseURL: URL {
         guard let url = URL(string: baseURLString) else {
@@ -37,7 +43,7 @@ class OllamaService {
     
     func sendSingleMessage(model: String, messages: [OllamaChatMessage]) async throws -> String {
         let url = baseURL.appendingPathComponent("chat")
-        let payload = OllamaChatRequest(model: model, messages: messages, stream: false)
+        let payload = OllamaChatRequest(model: model, messages: messages, stream: false, options: OllamaChatRequestOptions(num_ctx: contextWindowLength))
         
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
@@ -55,7 +61,7 @@ class OllamaService {
             Task {
                 do {
                     let url = baseURL.appendingPathComponent("chat")
-                    let payload = OllamaChatRequest(model: model, messages: messages, stream: true)
+                    let payload = OllamaChatRequest(model: model, messages: messages, stream: true, options: OllamaChatRequestOptions(num_ctx: contextWindowLength))
                     
                     var req = URLRequest(url: url)
                     req.httpMethod = "POST"

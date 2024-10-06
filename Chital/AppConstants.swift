@@ -3,6 +3,8 @@ import Foundation
 enum AppConstants {
     static let ollamaDefaultBaseURL = "http://127.0.0.1:11434/api"
     
+    static let contextWindowLength = 2048
+    
     static let titleSummaryPrompt = """
     Summarize the discussion with a single relevant emoji followed by exactly three words.
     The emoji should be at the beginning, and there should be no punctuation at the end.
