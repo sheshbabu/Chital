@@ -25,8 +25,10 @@ struct ChatThreadView: View {
                 ScrollView(.vertical) {
                     VStack(alignment: .leading, spacing: 24) {
                         ForEach(chronologicalMessages) { message in
-                            ChatBubbleView(message: message)
-                                .id(message.id)
+                            ChatBubbleView(message: message) {
+                                retry(message)
+                            }
+                            .id(message.id)
                         }
                     }
                     .padding()
@@ -45,7 +47,7 @@ struct ChatThreadView: View {
                 currentInputMessage: $currentInputMessage,
                 isTextFieldFocused: _isTextFieldFocused,
                 isThinking: thread.isThinking,
-                onSubmit: sendMessageStream,
+                onSubmit: insertChatMessage,
                 selectedModel: Binding(
                     get: { thread.selectedModel ?? "" },
                     set: { thread.selectedModel = $0 }
@@ -91,15 +93,10 @@ struct ChatThreadView: View {
     }
     
     private func sendMessageStream() {
-        if currentInputMessage.isEmpty {
-            return
-        }
-        
         if isDraft {
             convertDraftToRegularThread()
         }
         
-        insertChatMessage(currentInputMessage, isUser: true)
         currentInputMessage = ""
         thread.isThinking = true
         
@@ -147,10 +144,32 @@ struct ChatThreadView: View {
         context.insert(thread)
     }
     
-    private func insertChatMessage(_ text: String, isUser: Bool) {
-        let newMessage = ChatMessage(text: text, isUser: isUser, timestamp: Date())
+    private func insertChatMessage() {
+        if currentInputMessage.isEmpty {
+            return
+        }
+        
+        let newMessage = ChatMessage(text: currentInputMessage, isUser: true, timestamp: Date())
         thread.messages.append(newMessage)
         context.insert(newMessage)
+        
+        sendMessageStream()
+    }
+    
+    private func retry(_ message: ChatMessage) {
+        guard let index = chronologicalMessages.firstIndex(where: { $0.id == message.id }) else {
+            return
+        }
+        
+        let messagesToRemove = Array(chronologicalMessages[index...])
+        for messageToRemove in messagesToRemove {
+            if let messageIndex = thread.messages.firstIndex(where: { $0.id == messageToRemove.id }) {
+                thread.messages.remove(at: messageIndex)
+                context.delete(messageToRemove)
+            }
+        }
+        
+        sendMessageStream()
     }
     
     private func handleError(_ error: Error) async {

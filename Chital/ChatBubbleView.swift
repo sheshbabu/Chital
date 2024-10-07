@@ -4,6 +4,7 @@ import MarkdownUI
 struct ChatBubbleView: View {
     let message: ChatMessage
     @State private var isHovering = false
+    let onRetry: () -> Void
     
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -23,16 +24,16 @@ struct ChatBubbleView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 
                 HStack() {
-                    Button(action: copyText) {
-                        Label("Copy", systemImage: "doc.on.doc")
+                    HStack() {
+                        ChatBubbleButton(title: "Copy", systemImage: "doc.on.doc", action: copyText)
+                        if !message.isUser {
+                            ChatBubbleButton(title: "Retry", systemImage: "arrow.counterclockwise", action: onRetry)
+                        }
                     }
-                    .help("Copy")
-                    .buttonStyle(PlainButtonStyle())
-                    .font(.caption)
                     .foregroundColor(.secondary)
-                    .frame(alignment: .leading)
                     .padding(.vertical, 4)
                     .padding(.horizontal, 8)
+                    .padding(.trailing, -4)
                     .background(
                         RoundedRectangle(cornerRadius: 6, style: .continuous)
                             .fill(Color(NSColor.textBackgroundColor))
@@ -41,7 +42,7 @@ struct ChatBubbleView: View {
                         RoundedRectangle(cornerRadius: 6)
                             .stroke(Color.gray.opacity(0.3), lineWidth: 0.5)
                     )
-                    .offset(y: 16)
+                    .offset(y: 15)
                     .opacity(isHovering ? 1 : 0)
                     .animation(.easeInOut(duration: 0.2), value: isHovering)
                     
@@ -58,4 +59,45 @@ struct ChatBubbleView: View {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(message.text, forType: .string)
     }
+}
+
+struct ChatBubbleButton: View {
+    let title: String
+    let systemImage: String
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .labelStyle(.iconOnly)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .help(title)
+        .font(.caption)
+        .padding(.trailing, 4)
+    }
+}
+
+#Preview {
+    VStack(spacing: 20) {
+        ChatBubbleView(
+            message: ChatMessage(
+                text: "Hello!",
+                isUser: true,
+                timestamp: Date()
+            ),
+            onRetry: {}
+        )
+        
+        ChatBubbleView(
+            message: ChatMessage(
+                text: "Hello! How can I assist you today?",
+                isUser: false,
+                timestamp: Date()
+            ),
+            onRetry: {}
+        )
+    }
+    .padding()
+    .frame(width: 400)
 }
