@@ -16,6 +16,8 @@ struct ContentView: View {
     @State private var errorMessage: String?
     @State private var shouldShowErrorAlert = false
     
+    @State private var isShowingDeleteAllConfirmation = false
+    
     var body: some View {
         NavigationSplitView {
             List(threads, selection: $selectedThreadId) { thread in
@@ -24,6 +26,10 @@ struct ContentView: View {
                         .contextMenu {
                             Button(action: { deleteThread(thread) }) {
                                 Label("Delete", systemImage: "trash")
+                            }
+                            Divider()
+                            Button(action: { isShowingDeleteAllConfirmation = true }) {
+                                Label("Delete All Threads...", systemImage: "trash.fill")
                             }
                         }
                 }
@@ -36,6 +42,12 @@ struct ContentView: View {
                     }
                     .keyboardShortcut("n", modifiers: .command)
                 }
+            }
+            .alert("Delete All Threads", isPresented: $isShowingDeleteAllConfirmation) {
+                Button("Cancel", role: .cancel) { }
+                Button("Delete", role: .destructive, action: deleteAllThreads)
+            } message: {
+                Text("Are you sure you want to delete all threads?")
             }
         } detail: {
             if isLoadingModels {
@@ -88,6 +100,15 @@ struct ContentView: View {
             selectedThreadId = threads.first?.id
         }
     }
+    
+    private func deleteAllThreads() {
+        for thread in threads {
+            context.delete(thread)
+        }
+        selectedThreadId = nil
+        draftThread = createNewThread()
+    }
+    
     
     private func fetchAvailableModels() async {
         let ollamaService = OllamaService()
