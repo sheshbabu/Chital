@@ -69,6 +69,7 @@ struct SettingsView: View {
                     titleSummaryPrompt = AppConstants.titleSummaryPrompt
                     contextWindowLength = AppConstants.contextWindowLength
                     contextWindowLengthString = "\(AppConstants.contextWindowLength)"
+                    defaultModelName = AppConstants.defaultModelName
                 }
             }
             .padding()
