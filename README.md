@@ -25,6 +25,17 @@ https://github.com/user-attachments/assets/14eddab2-87c3-4dd5-b26a-a58e2f12f76a
 <img width="500" alt="Screenshot 2024-09-29 at 10 35 50 AM" src="https://github.com/user-attachments/assets/04f61c0b-a817-4350-854b-36140195fd1b">
 
 
+## Configuration
+The following settings can be changed from Chital > Settings:
+* Default model
+* Ollama base URL
+* Context window length
+* Chat thread title summarization prompt
+
+## Keyboard Shortcuts
+* `Command + N` New chat thread
+* `Option + Enter` Multiline input
+
 ## Contributions
 I built this application mainly for my own personal use. Feel free to fork this codebase to add features. I might not have time to look at the PRs and bug tickets.
 
