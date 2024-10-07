@@ -3,12 +3,27 @@ import SwiftUI
 struct SettingsView: View {
     @AppStorage("ollamaBaseURL") private var ollamaBaseURL = AppConstants.ollamaDefaultBaseURL
     @AppStorage("titleSummaryPrompt") private var titleSummaryPrompt = AppConstants.titleSummaryPrompt
+    
     @AppStorage("contextWindowLength") private var contextWindowLength = AppConstants.contextWindowLength
     @State private var contextWindowLengthString: String = ""
+    
+    @AppStorage("defaultModelName") private var defaultModelName = AppConstants.defaultModelName
+    @State private var availableModels: [String] = []
     
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Default Model")
+                        .font(.headline)
+                    
+                    Picker(selection: $defaultModelName, label: EmptyView()) {
+                        ForEach(availableModels, id: \.self) { model in
+                            Text(model).tag(model)
+                        }
+                    }
+                }
+                
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Ollama Base URL")
                         .font(.headline)
@@ -63,7 +78,21 @@ struct SettingsView: View {
                 contextWindowLength = value
             }
         }
-        .frame(minWidth: 300, minHeight: 300)
+        .task {
+            await fetchAvailableModels()
+        }
+        .frame(minWidth: 200, minHeight: 300)
+    }
+    
+    private func fetchAvailableModels() async {
+        let ollamaService = OllamaService()
+        
+        do {
+            let modelNames = try await ollamaService.fetchModelList()
+            availableModels = modelNames
+        } catch {
+            availableModels = []
+        }
     }
 }
 

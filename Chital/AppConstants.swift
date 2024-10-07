@@ -5,6 +5,8 @@ enum AppConstants {
     
     static let contextWindowLength = 2048
     
+    static let defaultModelName = ""
+    
     static let titleSummaryPrompt = """
     Summarize the discussion with a single relevant emoji followed by exactly three words.
     The emoji should be at the beginning, and there should be no punctuation at the end.

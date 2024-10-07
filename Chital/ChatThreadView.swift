@@ -3,6 +3,7 @@ import SwiftData
 
 struct ChatThreadView: View {
     @AppStorage("titleSummaryPrompt") private var titleSummaryPrompt = AppConstants.titleSummaryPrompt
+    @AppStorage("defaultModelName") private var defaultModelName = AppConstants.defaultModelName
     
     @Environment(\.modelContext) private var context
     @Bindable var thread: ChatThread
@@ -85,7 +86,7 @@ struct ChatThreadView: View {
     
     private func ensureModelSelected() {
         if thread.selectedModel == nil || !availableModels.contains(thread.selectedModel!) {
-            thread.selectedModel = availableModels.first
+            thread.selectedModel = defaultModelName == "" ? availableModels.first : defaultModelName
         }
     }
     

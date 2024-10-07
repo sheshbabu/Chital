@@ -2,6 +2,8 @@ import SwiftUI
 import SwiftData
 
 struct ContentView: View {
+    @AppStorage("defaultModelName") private var defaultModelName = AppConstants.defaultModelName
+    
     @Environment(\.modelContext) private var context
     @Query(sort: \ChatThread.createdAt, order: .reverse) private var threads: [ChatThread]
     
@@ -68,7 +70,8 @@ struct ContentView: View {
     }
     
     private func createNewThread() -> ChatThread {
-        return ChatThread(timestamp: Date(), title: "New Conversation", selectedModel: availableModels.first)
+        let selectedModel = defaultModelName == "" ? availableModels.first : defaultModelName
+        return ChatThread(timestamp: Date(), title: "New Conversation", selectedModel: selectedModel)
     }
     
     private func startNewThread() {
