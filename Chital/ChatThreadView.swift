@@ -25,7 +25,7 @@ struct ChatThreadView: View {
                 ScrollView(.vertical) {
                     VStack(alignment: .leading, spacing: 24) {
                         ForEach(chronologicalMessages) { message in
-                            ChatBubbleView(message: message) {
+                            ChatBubbleView(message: message, isThinking: thread.isThinking) {
                                 retry(message)
                             }
                             .id(message.id)
