@@ -3,6 +3,8 @@ import SwiftData
 
 @main
 struct ChitalApp: App {
+    @NSApplicationDelegateAdaptor() private var applicationDelegate: AppDelegate
+    
     var container: ModelContainer = {
         let schema = Schema([
             ChatThread.self,
