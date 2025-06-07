@@ -3,7 +3,7 @@ import SwiftData
 
 @Model
 final class ChatThread: Identifiable {
-    let id: UUID
+    private(set) var id: UUID
     var createdAt: Date
     var title: String
     var hasReceivedFirstMessage: Bool
@@ -23,7 +23,7 @@ final class ChatThread: Identifiable {
 
 @Model
 final class ChatMessage: Identifiable {
-    let id: UUID
+    private(set) var id: UUID
     var text: String
     var isUser: Bool
     var createdAt: Date
