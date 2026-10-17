@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="256" src="Chital/Assets.xcassets/AppIcon.appiconset/Icon 256.png">
+  <img width="256" src="icon.png">
   <h1 align="center">Chital</h1>
   <p align="center">A native macOS app for chatting with Ollama models</p>
 </p>
@@ -10,6 +10,8 @@
 * Multiple concurrent chat threads
 * Model switching during conversations
 * Markdown rendering for formatted responses
+* Image attachments for vision models
+* Reasoning display and thinking level picker for thinking models
 * Auto-generated thread titles based on conversation content
 
 https://github.com/user-attachments/assets/14eddab2-87c3-4dd5-b26a-a58e2f12f76a
@@ -30,7 +32,7 @@ https://github.com/user-attachments/assets/14eddab2-87c3-4dd5-b26a-a58e2f12f76a
 The following settings can be changed from Chital > Settings:
 * Default model
 * Ollama base URL
-* Context window length
+* Context length
 * Font size
 * Chat thread title summarization prompt
 
