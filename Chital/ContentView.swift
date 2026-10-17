@@ -3,26 +3,29 @@ import SwiftData
 
 struct ContentView: View {
     @AppStorage("defaultModelName") private var defaultModelName = AppConstants.defaultModelName
-    
+
     @Environment(\.modelContext) private var context
+    @Environment(ChatStreamer.self) private var streamer
     @Query(sort: \ChatThread.createdAt, order: .reverse) private var threads: [ChatThread]
-    
+
     @State private var selectedThreadId: ChatThread.ID?
-    @State private var draftThread: ChatThread?
-    
-    @State private var availableModels: [String] = []
-    @State private var isLoadingModels = true
-    
-    @State private var errorMessage: String?
-    @State private var shouldShowErrorAlert = false
-    
+    // Kept out of the database until its first message, so empty chats never show up in the sidebar.
+    @State private var draftThread = ChatThread(timestamp: Date(), title: "New Conversation")
+
+    @State private var availableModels: [OllamaModelInfo] = []
+    @State private var hasLoadedModels = false
+    @State private var modelsErrorMessage: String?
+
     @State private var isShowingDeleteAllConfirmation = false
-    
+
     var body: some View {
+        // Read here rather than inside the alert's closures so SwiftUI observes changes to it.
+        let errorMessage = streamer.errorMessage
+        
         NavigationSplitView {
             List(threads, selection: $selectedThreadId) { thread in
                 NavigationLink(value: thread.id) {
-                    Text(thread.title)
+                    ThreadRow(title: thread.title)
                         .contextMenu {
                             Button(action: { deleteThread(thread) }) {
                                 Label("Delete", systemImage: "trash")
@@ -50,99 +53,121 @@ struct ContentView: View {
                 Text("Are you sure you want to delete all threads?")
             }
         } detail: {
-            if isLoadingModels {
+            if let modelsErrorMessage, !hasLoadedModels {
+                ContentUnavailableView {
+                    Label("Can't Load Models", systemImage: "exclamationmark.triangle")
+                } description: {
+                    Text(modelsErrorMessage)
+                } actions: {
+                    Button("Retry") {
+                        Task { await fetchAvailableModels() }
+                    }
+                }
+            } else if !hasLoadedModels {
                 ProgressView("Loading models...")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                let selectedThread = threads.first(where: { $0.id == selectedThreadId })
-                let threadToDisplay = selectedThread ?? draftThread ?? createNewThread()
-                let isDraft = selectedThread == nil
-                
+                let thread = threads.first(where: { $0.id == selectedThreadId }) ?? draftThread
+
                 ChatThreadView(
-                    thread: threadToDisplay,
-                    isDraft: .constant(isDraft),
-                    availableModels: availableModels
+                    thread: thread,
+                    availableModels: availableModels,
+                    onFirstMessage: { selectedThreadId = thread.id }
                 )
-                .navigationTitle(Text(threadToDisplay.title))
+                .id(thread.id)
+                .navigationTitle(Text(thread.title))
             }
         }
         .task {
             await fetchAvailableModels()
-            if draftThread == nil {
-                draftThread = createNewThread()
-            }
         }
-        .alert("Error", isPresented: $shouldShowErrorAlert, actions: {
+        // Picks up models pulled or removed while the app was in the background.
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            Task { await fetchAvailableModels() }
+        }
+        .alert("Error", isPresented: Binding(
+            get: { errorMessage != nil },
+            set: { if !$0 { streamer.errorMessage = nil } }
+        ), actions: {
             Button("OK") {
-                errorMessage = nil
+                streamer.errorMessage = nil
             }
         }, message: {
             Text(errorMessage ?? "An unknown error occurred.")
         })
     }
-    
-    private func createNewThread() -> ChatThread {
-        let selectedModel = defaultModelName == "" ? availableModels.first : defaultModelName
-        return ChatThread(timestamp: Date(), title: "New Conversation", selectedModel: selectedModel)
-    }
-    
+
     private func startNewThread() {
-        let newThread = createNewThread()
-        context.insert(newThread)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            selectedThreadId = newThread.id
+        selectedThreadId = nil
+        if draftThread.modelContext != nil {
+            draftThread = ChatThread(timestamp: Date(), title: "New Conversation")
         }
     }
-    
+
     private func deleteThread(_ thread: ChatThread) {
-        context.delete(thread)
+        streamer.stop(thread)
         if selectedThreadId == thread.id {
-            selectedThreadId = threads.first?.id
+            // Select the neighbouring thread, since the query won't reflect the deletion until the next update.
+            let remaining = threads.filter { $0.id != thread.id }
+            let index = threads.firstIndex(where: { $0.id == thread.id }) ?? 0
+            selectedThreadId = remaining.isEmpty ? nil : remaining[min(index, remaining.count - 1)].id
         }
+        if thread.id == draftThread.id {
+            draftThread = ChatThread(timestamp: Date(), title: "New Conversation")
+        }
+        context.delete(thread)
     }
-    
+
     private func deleteAllThreads() {
+        streamer.stopAll()
+        selectedThreadId = nil
+        draftThread = ChatThread(timestamp: Date(), title: "New Conversation")
         for thread in threads {
             context.delete(thread)
         }
-        selectedThreadId = nil
-        draftThread = createNewThread()
     }
-    
-    
+
     private func fetchAvailableModels() async {
-        let ollamaService = OllamaService()
-        
         do {
-            let modelNames = try await ollamaService.fetchModelList()
-            await MainActor.run {
-                availableModels = modelNames
-                isLoadingModels = false
-            }
+            availableModels = try await OllamaService().fetchModels()
+            hasLoadedModels = true
+            modelsErrorMessage = nil
         } catch {
-            await handleError(error)
+            // After a successful load, keep the last known models so a brief outage doesn't blank the window.
+            if !hasLoadedModels {
+                modelsErrorMessage = ollamaErrorMessage(error)
+            }
         }
     }
+}
+
+// Shows a title's leading emoji in a fixed icon column so titles line up, with a placeholder icon when there is none.
+struct ThreadRow: View {
+    let title: String
     
-    private func handleError(_ error: Error) async {
-        await MainActor.run {
-            shouldShowErrorAlert = true
-            
-            let networkError = error as? URLError
-            let defaultErrorMessage = "An unexpected error occurred while communicating with the Ollama API: \(error.localizedDescription)"
-            
-            if networkError == nil {
-                errorMessage = defaultErrorMessage
-            } else {
-                switch networkError?.code {
-                case .cannotConnectToHost:
-                    errorMessage = "Unable to connect to the Ollama API. Please ensure that the Ollama server is running."
-                case .timedOut:
-                    errorMessage = "The request to Ollama API timed out. Please try again later."
-                default:
-                    errorMessage = defaultErrorMessage
+    var body: some View {
+        HStack(spacing: 8) {
+            Group {
+                if let emoji = leadingEmoji {
+                    Text(emoji)
+                } else {
+                    Image(systemName: "bubble.left")
+                        .foregroundStyle(.secondary)
                 }
             }
+            .frame(width: 20)
+            
+            Text(leadingEmoji.map { String(title.dropFirst($0.count)).trimmingCharacters(in: .whitespaces) } ?? title)
+                .lineLimit(1)
         }
+    }
+    
+    private var leadingEmoji: String? {
+        guard let first = title.first, let scalar = first.unicodeScalars.first else {
+            return nil
+        }
+        // Digits and symbols like # count as emoji scalars, so require emoji presentation or a multi-scalar emoji.
+        let isEmoji = scalar.properties.isEmojiPresentation || (scalar.properties.isEmoji && first.unicodeScalars.count > 1)
+        return isEmoji ? String(first) : nil
     }
 }

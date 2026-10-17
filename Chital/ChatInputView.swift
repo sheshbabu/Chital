@@ -1,86 +1,88 @@
 import SwiftUI
+import ImageIO
+import UniformTypeIdentifiers
+
+struct ImageAttachment: Identifiable {
+    let id = UUID()
+    let data: Data
+    let thumbnail: NSImage
+}
 
 struct ChatInputView: View {
-    @Binding var currentInputMessage: String
-    @FocusState var isTextFieldFocused: Bool
-    let isThinking: Bool
-    let onSubmit: () -> Void
+    let isStreaming: Bool
+    let onSubmit: (String, [Data]) -> Void
     let onStop: () -> Void
-    
+
     @Binding var selectedModel: String
-    let modelOptions: [String]
-    
-    @Binding var attachedImages: [Data]
+    @Binding var thinkLevel: String?
+    let models: [OllamaModelInfo]
+
+    @State private var currentInputMessage = ""
+    @State private var attachments: [ImageAttachment] = []
     @State private var showImagePicker = false
     @State private var isProcessingImages = false
-    @State private var thumbnailCache: [Data: NSImage] = [:] // Cache for thumbnails
-    
-    let onImagesChanged: ([Data]) -> Void
-    
+    @FocusState private var isTextFieldFocused: Bool
+
     @AppStorage("fontSize") private var fontSize = AppConstants.defaultFontSize
-    
+
+    private var selectedModelInfo: OllamaModelInfo? {
+        models.first { $0.name == selectedModel }
+    }
+
+    private var canAttachImages: Bool {
+        selectedModelInfo?.supportsImages ?? false
+    }
+
     var body: some View {
         VStack {
             HStack {
                 Spacer()
+                if let levels = selectedModelInfo?.thinkLevels, !levels.isEmpty {
+                    Picker(selection: $thinkLevel, label: EmptyView()) {
+                        Text("Default thinking").tag(String?.none)
+                        ForEach(levels, id: \.self) { level in
+                            Text(thinkLevelLabel(level)).tag(String?.some(level))
+                        }
+                    }
+                    .buttonStyle(.borderless)
+                    .fixedSize()
+                    .help("Thinking")
+                }
                 Picker(selection: $selectedModel, label: EmptyView()) {
-                    ForEach(modelOptions, id: \.self) { model in
-                        Text(model).tag(model)
+                    ForEach(models, id: \.name) { model in
+                        Text(model.name).tag(model.name)
                     }
                 }
-                .onChange(of: selectedModel) { _, _ in isTextFieldFocused = true }
+                .onChange(of: selectedModel) { isTextFieldFocused = true }
                 .buttonStyle(.borderless)
                 .fixedSize()
-                .disabled(modelOptions.isEmpty)
+                .disabled(models.isEmpty)
             }
             .padding(.trailing)
-            
-            if !attachedImages.isEmpty {
+            .padding(.bottom, 6)
+
+            if !attachments.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        ForEach(attachedImages.indices, id: \.self) { index in
-                            ZStack {
-                                let imageData = attachedImages[index]
-                                if let cachedImage = thumbnailCache[imageData] {
-                                    Image(nsImage: cachedImage)
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fill)
-                                        .frame(width: 60, height: 60)
-                                        .cornerRadius(8)
-                                        .clipped()
-                                } else if let nsImage = NSImage(data: imageData) {
-                                    Image(nsImage: nsImage)
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fill)
-                                        .frame(width: 60, height: 60)
-                                        .cornerRadius(8)
-                                        .clipped()
-                                        .onAppear {
-                                            // Cache the thumbnail on first render
-                                            thumbnailCache[imageData] = nsImage
-                                        }
+                        ForEach(attachments) { attachment in
+                            ZStack(alignment: .topTrailing) {
+                                Image(nsImage: attachment.thumbnail)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 60, height: 60)
+                                    .cornerRadius(8)
+                                    .clipped()
+
+                                Button(action: {
+                                    attachments.removeAll { $0.id == attachment.id }
+                                }) {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.system(size: 16))
+                                        .foregroundColor(.white)
+                                        .background(Color.black.opacity(0.8))
+                                        .clipShape(Circle())
                                 }
-                                
-                                VStack {
-                                    HStack {
-                                        Spacer()
-                                        Button(action: {
-                                            let imageData = attachedImages[index]
-                                            attachedImages.remove(at: index)
-                                            thumbnailCache.removeValue(forKey: imageData) // Clean up cache
-                                            onImagesChanged(attachedImages)
-                                        }) {
-                                            Image(systemName: "xmark.circle.fill")
-                                                .font(.system(size: 16))
-                                                .foregroundColor(.white)
-                                                .background(Color.black.opacity(0.8))
-                                                .clipShape(Circle())
-                                        }
-                                        .buttonStyle(PlainButtonStyle())
-                                        .offset(x: 0, y: 0)
-                                    }
-                                    Spacer()
-                                }
+                                .buttonStyle(PlainButtonStyle())
                             }
                             .frame(width: 60, height: 60)
                         }
@@ -89,20 +91,22 @@ struct ChatInputView: View {
                 }
                 .frame(height: 68)
             }
-            
+
             HStack {
-                Button(action: {
-                    showImagePicker = true
-                }) {
-                    Image(systemName: isProcessingImages ? "clock" : "plus.circle")
-                        .font(.title2)
-                        .foregroundColor(isThinking || modelOptions.isEmpty || isProcessingImages ? .gray : .primary)
+                if canAttachImages {
+                    Button(action: {
+                        showImagePicker = true
+                    }) {
+                        Image(systemName: isProcessingImages ? "clock" : "plus.circle")
+                            .font(.title2)
+                            .foregroundColor(isStreaming || isProcessingImages ? .gray : .primary)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .disabled(isStreaming || isProcessingImages)
+                    .help(isProcessingImages ? "Processing images..." : "Attach images")
                 }
-                .buttonStyle(PlainButtonStyle())
-                .disabled(isThinking || modelOptions.isEmpty || isProcessingImages)
-                .help(isProcessingImages ? "Processing images..." : "Attach images")
-                
-                TextField(isThinking ? "Thinking..." : "How can I help you today?", text: $currentInputMessage, axis: .vertical)
+
+                TextField(isStreaming ? "Thinking..." : "How can I help you today?", text: $currentInputMessage, axis: .vertical)
                     .textFieldStyle(PlainTextFieldStyle())
                     .font(.system(size: fontSize))
                     .lineLimit(10)
@@ -113,15 +117,19 @@ struct ChatInputView: View {
                     .overlay(
                         RoundedRectangle(cornerRadius: 20)
                             .stroke(Color.gray.opacity(0.3), lineWidth: 0.5)
-                    )                .onSubmit(onSubmit)
-                .disabled(isThinking || modelOptions.isEmpty)
-                .focused($isTextFieldFocused)
-                .onDrop(of: [.image], isTargeted: nil) { providers in
-                    handleDroppedImages(providers: providers)
-                    return true
-                }
-                
-                if isThinking {
+                    )
+                    .onSubmit(submit)
+                    .disabled(isStreaming || models.isEmpty)
+                    .focused($isTextFieldFocused)
+                    .onDrop(of: [.image], isTargeted: nil) { providers in
+                        guard canAttachImages else {
+                            return false
+                        }
+                        handleDroppedImages(providers: providers)
+                        return true
+                    }
+
+                if isStreaming {
                     Button(action: onStop) {
                         Image(systemName: "stop.circle.fill")
                             .font(.title2)
@@ -132,6 +140,15 @@ struct ChatInputView: View {
             }
             .padding(.horizontal)
         }
+        .padding(.bottom, 12)
+        .onAppear {
+            isTextFieldFocused = true
+        }
+        .onChange(of: isStreaming) { _, isStreaming in
+            if !isStreaming {
+                isTextFieldFocused = true
+            }
+        }
         .fileImporter(
             isPresented: $showImagePicker,
             allowedContentTypes: [.image],
@@ -139,141 +156,124 @@ struct ChatInputView: View {
         ) { result in
             switch result {
             case .success(let urls):
-                isProcessingImages = true
-                // Process images on background thread to avoid stuttering
-                DispatchQueue.global(qos: .userInitiated).async {
-                    var processedImages: [Data] = []
-                    
-                    for url in urls {
-                        if url.startAccessingSecurityScopedResource() {
-                            defer { url.stopAccessingSecurityScopedResource() }
-                            
-                            if let nsImage = NSImage(contentsOf: url),
-                               let processedData = self.processImageForAttachment(nsImage) {
-                                processedImages.append(processedData)
-                            }
+                processImages(urls.map { url in
+                    { () async -> Data? in
+                        guard url.startAccessingSecurityScopedResource() else {
+                            return nil
                         }
+                        defer { url.stopAccessingSecurityScopedResource() }
+                        return try? Data(contentsOf: url)
                     }
-                    
-                    DispatchQueue.main.async {
-                        attachedImages.append(contentsOf: processedImages)
-                        onImagesChanged(attachedImages)
-                        isProcessingImages = false
-                    }
-                }
+                })
             case .failure(let error):
                 print("Failed to import images: \(error)")
-                isProcessingImages = false
             }
         }
     }
-    
+
+    private func submit() {
+        let text = currentInputMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+        if text.isEmpty && attachments.isEmpty {
+            return
+        }
+        onSubmit(text, attachments.map { $0.data })
+        currentInputMessage = ""
+        attachments = []
+    }
+
+    private func thinkLevelLabel(_ level: String) -> String {
+        switch level {
+        case "true": return "Thinking on"
+        case "false": return "Thinking off"
+        default: return "\(level.capitalized) thinking"
+        }
+    }
+
     private func handleDroppedImages(providers: [NSItemProvider]) {
-        isProcessingImages = true
-        var processedCount = 0
-        let totalCount = providers.count
-        
-        for provider in providers {
-            if provider.canLoadObject(ofClass: NSImage.self) {
-                provider.loadObject(ofClass: NSImage.self) { image, error in
-                    if let nsImage = image as? NSImage {
-                        // Process image on background thread
-                        DispatchQueue.global(qos: .userInitiated).async {
-                            let processedData = self.processImageForAttachment(nsImage)
-                            DispatchQueue.main.async {
-                                if let data = processedData {
-                                    attachedImages.append(data)
-                                    onImagesChanged(attachedImages)
-                                }
-                                processedCount += 1
-                                if processedCount >= totalCount {
-                                    isProcessingImages = false
-                                }
-                            }
-                        }
-                    } else {
-                        DispatchQueue.main.async {
-                            processedCount += 1
-                            if processedCount >= totalCount {
-                                isProcessingImages = false
-                            }
-                        }
+        let loaders: [() async -> Data?] = providers.map { provider in
+            {
+                await withCheckedContinuation { continuation in
+                    provider.loadDataRepresentation(forTypeIdentifier: UTType.image.identifier) { data, _ in
+                        continuation.resume(returning: data)
                     }
                 }
-            } else {
-                processedCount += 1
-                if processedCount >= totalCount {
-                    isProcessingImages = false
+            }
+        }
+        processImages(loaders)
+    }
+
+    // Image decoding and encoding run off the main thread to keep typing smooth.
+    private func processImages(_ loaders: [() async -> Data?]) {
+        isProcessingImages = true
+        Task {
+            for loader in loaders {
+                guard let data = await loader() else {
+                    continue
+                }
+                let attachment = await Task.detached(priority: .userInitiated) {
+                    ChatInputView.makeAttachment(from: data)
+                }.value
+                if let attachment {
+                    attachments.append(attachment)
                 }
             }
+            isProcessingImages = false
         }
     }
-    
-    private func processImageForAttachment(_ nsImage: NSImage) -> Data? {
-        // Resize image to reasonable preview size to reduce memory usage
-        let maxDimension: CGFloat = 1024
-        let originalSize = nsImage.size
-        
-        var targetSize = originalSize
-        if originalSize.width > maxDimension || originalSize.height > maxDimension {
-            let aspectRatio = originalSize.width / originalSize.height
-            if originalSize.width > originalSize.height {
-                targetSize = CGSize(width: maxDimension, height: maxDimension / aspectRatio)
-            } else {
-                targetSize = CGSize(width: maxDimension * aspectRatio, height: maxDimension)
-            }
-        }
-        
-        let resizedImage = NSImage(size: targetSize)
-        resizedImage.lockFocus()
-        nsImage.draw(in: NSRect(origin: .zero, size: targetSize))
-        resizedImage.unlockFocus()
-        
-        guard let tiffData = resizedImage.tiffRepresentation,
-              let bitmapRep = NSBitmapImageRep(data: tiffData),
-              let compressedData = bitmapRep.representation(using: .jpeg, properties: [.compressionFactor: 0.7]) else {
+
+    // Vision models downscale anyway, so larger images only cost memory and upload time.
+    nonisolated private static func makeAttachment(from data: Data) -> ImageAttachment? {
+        let maxPixelSize = 1024
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
             return nil
         }
-        
-        return compressedData
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixelSize
+        ]
+        guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
+            return nil
+        }
+
+        let hasAlpha = ![.none, .noneSkipFirst, .noneSkipLast].contains(image.alphaInfo)
+        let type = hasAlpha ? UTType.png : UTType.jpeg
+        let output = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(output, type.identifier as CFString, 1, nil) else {
+            return nil
+        }
+        CGImageDestinationAddImage(destination, image, [kCGImageDestinationLossyCompressionQuality: 0.8] as CFDictionary)
+        guard CGImageDestinationFinalize(destination) else {
+            return nil
+        }
+
+        let thumbnail = NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
+        return ImageAttachment(data: output as Data, thumbnail: thumbnail)
     }
 }
 
 #Preview {
     struct PreviewWrapper: View {
-        @State private var currentInputMessage = ""
         @State private var selectedModel = "llama3.1"
-        @State private var attachedImages: [Data] = []
-        @FocusState private var isTextFieldFocused: Bool
-        let modelOptions = ["llama3.1", "llama3.2"]
-        
+        @State private var thinkLevel: String?
+        let models = [
+            OllamaModelInfo(name: "llama3.1", capabilities: ["completion"], thinkLevels: []),
+            OllamaModelInfo(name: "gemma4", capabilities: ["completion", "vision", "thinking"], thinkLevels: ["false", "true"])
+        ]
+
         var body: some View {
             ChatInputView(
-                currentInputMessage: $currentInputMessage,
-                isTextFieldFocused: _isTextFieldFocused,
-                isThinking: false,
-                onSubmit: {},
+                isStreaming: false,
+                onSubmit: { _, _ in },
                 onStop: {},
                 selectedModel: $selectedModel,
-                modelOptions: modelOptions,
-                attachedImages: $attachedImages,
-                onImagesChanged: { images in
-                    attachedImages = images
-                }
+                thinkLevel: $thinkLevel,
+                models: models
             )
             .frame(height: 100)
             .padding()
-            .onAppear { isTextFieldFocused = true }
         }
     }
-    
-    return PreviewWrapper()
-}
 
-extension ChatInputView {
-    func clearImages() {
-        attachedImages.removeAll()
-        thumbnailCache.removeAll() // Clear thumbnail cache as well
-        onImagesChanged(attachedImages)
-    }
+    return PreviewWrapper()
 }

@@ -1,0 +1,36 @@
+{
+  "fill" : "system-light",
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "blend-mode" : "normal",
+          "fill" : "none",
+          "image-name" : "Cute Deer Fawn Icon with Antlers.png",
+          "name" : "Cute Deer Fawn Icon with Antlers",
+          "position" : {
+            "scale" : 0.8,
+            "translation-in-points" : [
+              0.5,
+              8.5703125
+            ]
+          }
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "circles" : [
+      "watchOS"
+    ],
+    "squares" : "shared"
+  }
+}

@@ -3,6 +3,8 @@ import SwiftData
 
 @main
 struct ChitalApp: App {
+    @State private var streamer = ChatStreamer()
+    
     var container: ModelContainer = {
         let schema = Schema([
             ChatThread.self,
@@ -20,7 +22,9 @@ struct ChitalApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environment(streamer)
         }
+        .defaultSize(width: 1000, height: 700)
         .modelContainer(container)
         .commands {
             CommandGroup(replacing: .saveItem) {}
