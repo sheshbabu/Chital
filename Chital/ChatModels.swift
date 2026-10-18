@@ -10,6 +10,10 @@ final class ChatThread: Identifiable {
     var selectedModel: String?
     // Nil means the model's default thinking behaviour.
     var thinkLevel: String?
+    // Nil for threads saved before this was tracked.
+    var updatedAt: Date?
+    // The unsent input, kept per thread so it survives switching threads and relaunching.
+    var draft: String?
     @Relationship(deleteRule: .cascade) var messages: [ChatMessage] = []
 
     init(timestamp: Date, title: String = "", hasReceivedFirstMessage: Bool = false, selectedModel: String? = nil) {

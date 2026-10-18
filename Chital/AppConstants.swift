@@ -8,6 +8,9 @@ enum AppConstants {
     
     static let defaultModelName = ""
     
+    // Empty means no system message is sent.
+    static let systemPrompt = ""
+    
     static let defaultFontSize: Double = 14.0
     
     // Caps line length in wide windows, as long lines are hard to read.

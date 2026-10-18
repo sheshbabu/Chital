@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @AppStorage("ollamaBaseURL") private var ollamaBaseURL = AppConstants.ollamaDefaultBaseURL
     @AppStorage("titleSummaryPrompt") private var titleSummaryPrompt = AppConstants.titleSummaryPrompt
+    @AppStorage("systemPrompt") private var systemPrompt = AppConstants.systemPrompt
 
     @AppStorage("contextLength") private var contextLength = AppConstants.contextLength
     @State private var contextLengthString: String = ""
@@ -22,6 +23,10 @@ struct SettingsView: View {
                     Text("First available").tag("")
                     ForEach(availableModels, id: \.self) { model in
                         Text(model).tag(model)
+                    }
+                    // Without a matching tag the picker shows blank, so a saved model that's gone is still listed.
+                    if !defaultModelName.isEmpty && !availableModels.contains(defaultModelName) {
+                        Text("\(defaultModelName) (not installed)").tag(defaultModelName)
                     }
                 }
 
@@ -61,6 +66,22 @@ struct SettingsView: View {
             }
 
             Section {
+                TextEditor(text: $systemPrompt)
+                    .font(.body)
+                    .scrollContentBackground(.hidden)
+                    .frame(minHeight: 80)
+            } header: {
+                Text("System prompt")
+            } footer: {
+                Text("Sent at the start of every chat, for example to set a tone or describe yourself. Leave it empty to use the model's default.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    // Lines up with the section headers rather than the box edge.
+                    .padding(.leading, 12)
+            }
+
+            Section {
                 TextEditor(text: $titleSummaryPrompt)
                     .font(.body)
                     .scrollContentBackground(.hidden)
@@ -82,6 +103,7 @@ struct SettingsView: View {
                     Button("Restore Defaults") {
                         ollamaBaseURL = AppConstants.ollamaDefaultBaseURL
                         titleSummaryPrompt = AppConstants.titleSummaryPrompt
+                        systemPrompt = AppConstants.systemPrompt
                         contextLength = AppConstants.contextLength
                         contextLengthString = ""
                         defaultModelName = AppConstants.defaultModelName

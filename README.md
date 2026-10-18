@@ -6,13 +6,18 @@
 
 ## Features
 * Fast launch times with minimal memory footprint
-* Compact 2MB binary size
+* Compact binary under 5MB
 * Multiple concurrent chat threads
 * Model switching during conversations
 * Markdown rendering for formatted responses
 * Image attachments for vision models
 * Reasoning display and thinking level picker for thinking models
 * Auto-generated thread titles based on conversation content
+* Search, rename and branch threads
+* Edit and resend messages, retry replies
+* Copy buttons on replies and code blocks
+* Paste images with `Command + V`
+* Export a thread as Markdown
 
 https://github.com/user-attachments/assets/14eddab2-87c3-4dd5-b26a-a58e2f12f76a
 
@@ -33,12 +38,18 @@ The following settings can be changed from Chital > Settings:
 * Default model
 * Ollama base URL
 * Context length
+* System prompt
 * Font size
 * Chat thread title summarization prompt
 
 ## Keyboard Shortcuts
 * `Command + N` New chat thread
 * `Option + Enter` Multiline input
+* `Command + L` Focus the message field
+* `Command + .` Stop generating
+* `Command + Shift + C` Copy the last reply
+* `Command + Shift + E` Export the thread as Markdown
+* `Command + Shift + [` and `Command + Shift + ]` Previous and next thread
 
 ## Contributions
 This is a personal project built for my own use. The codebase is available for forking and modifications. Note that I may not actively review pull requests or respond to issues due to time constraints.
