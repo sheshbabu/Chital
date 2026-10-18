@@ -14,6 +14,8 @@ struct ChatThreadView: View {
     @State private var exportDocument: MarkdownDocument?
     // Only recent messages are laid out until asked, since the eager list lays out every message on each update.
     @State private var showsAllMessages = false
+    @State private var droppedItems: [NSItemProvider] = []
+    @State private var isDropTargeted = false
     // Kept here while typing, since writing it to the thread on every keystroke would invalidate every SwiftData view.
     @State private var draft: String
     @FocusState private var isInputFocused: Bool
@@ -48,12 +50,23 @@ struct ChatThreadView: View {
                 ),
                 thinkLevel: $thread.thinkLevel,
                 isFocused: $isInputFocused,
-                models: availableModels
+                models: availableModels,
+                droppedItems: $droppedItems
             )
             // The input's own horizontal padding lines its edges up with the message column.
             .frame(maxWidth: AppConstants.chatColumnWidth + 32)
         }
         .padding()
+        // Covers the input too once it shows, so a drop over the text field lands here instead of typing in the file's path.
+        .overlay {
+            if isDropTargeted {
+                DropOverlay()
+            }
+        }
+        .onDrop(of: [.image, .fileURL], isTargeted: $isDropTargeted) { providers in
+            droppedItems = providers
+            return true
+        }
         .onAppear(perform: ensureModelSelected)
         .onChange(of: availableModels) {
             ensureModelSelected()
@@ -283,6 +296,9 @@ struct ChatThreadView: View {
         for original in messages[...index] {
             let copy = ChatMessage(text: original.text, isUser: original.isUser, timestamp: original.createdAt, images: original.images)
             copy.thinking = original.thinking
+            copy.tokensPerSecond = original.tokensPerSecond
+            copy.contextUsage = original.contextUsage
+            copy.thinkingSeconds = original.thinkingSeconds
             newThread.messages.append(copy)
         }
         try? context.save()
@@ -328,6 +344,20 @@ private struct StreamFollower: View {
                     scrollToBottom()
                 }
             }
+    }
+}
+
+private struct DropOverlay: View {
+    var body: some View {
+        RoundedRectangle(cornerRadius: 12)
+            .strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 2, dash: [6]))
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+            .overlay {
+                Label("Drop images or text files", systemImage: "doc.badge.plus")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(8)
     }
 }
 

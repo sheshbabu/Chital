@@ -1,5 +1,6 @@
 import SwiftUI
 import ImageIO
+import QuickLook
 import UniformTypeIdentifiers
 
 struct ImageAttachment: Identifiable {
@@ -18,6 +19,8 @@ struct ChatInputView: View {
     @Binding var thinkLevel: String?
     var isFocused: FocusState<Bool>.Binding
     let models: [OllamaModelInfo]
+    // Dropped on the whole chat pane, since the text field would take file drops itself and type in their paths.
+    @Binding var droppedItems: [NSItemProvider]
 
     @State private var attachments: [ImageAttachment] = []
     @State private var showImagePicker = false
@@ -27,6 +30,7 @@ struct ChatInputView: View {
     // Mirrored into state because the paste monitor's closure keeps the view as it was when installed, and state reads stay live.
     @State private var canPasteImages = false
     @State private var inputWindow: NSWindow?
+    @State private var previewURL: URL?
 
     @AppStorage("fontSize") private var fontSize = AppConstants.defaultFontSize
 
@@ -91,6 +95,9 @@ struct ChatInputView: View {
                                     .aspectRatio(contentMode: .fill)
                                     .frame(width: 60, height: 60)
                                     .clipShape(.rect(cornerRadius: 8))
+                                    .onTapGesture {
+                                        previewURL = quickLookFile(for: attachment.data, name: attachment.id.uuidString)
+                                    }
 
                                 Button(action: {
                                     attachments.removeAll { $0.id == attachment.id }
@@ -146,13 +153,6 @@ struct ChatInputView: View {
                     }
                     .disabled(models.isEmpty)
                     .focused(isFocused)
-                    .onDrop(of: [.image], isTargeted: nil) { providers in
-                        guard canAttachImages else {
-                            return false
-                        }
-                        handleDroppedImages(providers: providers)
-                        return true
-                    }
 
                 // Send and Stop share one spot, as in ChatGPT and Claude.
                 if isStreaming {
@@ -185,6 +185,18 @@ struct ChatInputView: View {
         }
         .onChange(of: canAttachImages) {
             canPasteImages = canAttachImages
+        }
+        .quickLookPreview($previewURL)
+        .onChange(of: droppedItems) {
+            guard !droppedItems.isEmpty else {
+                return
+            }
+            let images = droppedItems.filter { $0.hasItemConformingToTypeIdentifier(UTType.image.identifier) }
+            if canAttachImages && !images.isEmpty {
+                handleDroppedImages(providers: images)
+            }
+            insertTextFiles(from: droppedItems.filter { !images.contains($0) })
+            droppedItems = []
         }
         // The window that holds the focused input, so a paste in Settings or another chat window is left alone.
         .onChange(of: isFocused.wrappedValue, initial: true) {
@@ -284,6 +296,35 @@ struct ChatInputView: View {
         processImages(loaders)
     }
 
+    // Text and code files go into the message as fenced blocks named after the file, and other files are skipped.
+    private func insertTextFiles(from providers: [NSItemProvider]) {
+        Task {
+            for provider in providers {
+                let url = await withCheckedContinuation { continuation in
+                    _ = provider.loadObject(ofClass: URL.self) { url, _ in
+                        continuation.resume(returning: url)
+                    }
+                }
+                guard let url, UTType(filenameExtension: url.pathExtension)?.conforms(to: .text) == true,
+                      let contents = try? String(contentsOf: url, encoding: .utf8) else {
+                    continue
+                }
+                // A blank line before each block, so several dropped files stay apart.
+                let separator = text.isEmpty || text.hasSuffix("\n\n") ? "" : text.hasSuffix("\n") ? "\n" : "\n\n"
+                text += separator + Self.fencedBlock(name: url.lastPathComponent, contents: contents)
+            }
+        }
+    }
+
+    // The fence is longer than any backtick run inside, so a Markdown file with its own code blocks stays intact.
+    private static func fencedBlock(name: String, contents: String) -> String {
+        var fence = "```"
+        while contents.contains(fence) {
+            fence += "`"
+        }
+        return "\(name):\n\(fence)\n\(contents.trimmingCharacters(in: .newlines))\n\(fence)\n"
+    }
+
     // Image decoding and encoding run off the main thread to keep typing smooth.
     private func processImages(_ loaders: [() async -> Data?]) {
         processingImageBatches += 1
@@ -354,7 +395,8 @@ struct ChatInputView: View {
                 selectedModel: $selectedModel,
                 thinkLevel: $thinkLevel,
                 isFocused: $isFocused,
-                models: models
+                models: models,
+                droppedItems: .constant([])
             )
             .frame(height: 100)
             .padding()

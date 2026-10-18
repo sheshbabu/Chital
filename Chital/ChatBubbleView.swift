@@ -1,6 +1,8 @@
 import SwiftUI
 import MarkdownUI
 import ImageIO
+import QuickLook
+import UniformTypeIdentifiers
 
 struct ChatBubbleView: View {
     let message: ChatMessage
@@ -41,6 +43,9 @@ struct ChatBubbleView: View {
             // Always laid out so spacing doesn't jump while streaming, and revealed on hover except for a failed message's retry.
             let canShowActions = text != "" && !isStreaming && editText == nil
             HStack(spacing: 4) {
+                if message.isUser {
+                    details
+                }
                 CopyButton(text: message.text)
                 if message.isUser && canEdit {
                     ChatBubbleButton(title: "Edit", systemImage: "pencil") {
@@ -52,6 +57,9 @@ struct ChatBubbleView: View {
                 }
                 if canRetry {
                     ChatBubbleButton(title: "Retry", systemImage: "arrow.counterclockwise", action: onRetry)
+                }
+                if !message.isUser {
+                    details
                 }
             }
             .foregroundStyle(.secondary)
@@ -65,6 +73,21 @@ struct ChatBubbleView: View {
         }
     }
     
+    // Hover only, even when a failed message's Retry stays visible.
+    private var details: some View {
+        let time = Calendar.current.isDateInToday(message.createdAt)
+            ? message.createdAt.formatted(date: .omitted, time: .shortened)
+            : message.createdAt.formatted(date: .abbreviated, time: .shortened)
+        let speed = message.tokensPerSecond.map { " · \(Int($0.rounded())) tok/s" } ?? ""
+        // Only worth noticing once the chat is far enough in to approach the limit.
+        let context = message.contextUsage.flatMap { $0 >= 0.2 ? " · ctx \(Int(($0 * 100).rounded()))%" : nil } ?? ""
+        return Text(time + speed + context)
+            .font(.system(size: 11))
+            .monospacedDigit()
+            .padding(.horizontal, 4)
+            .opacity(isHovering ? 1 : 0)
+    }
+
     // Editing a message replaces it and drops everything after it, then asks again.
     private func editor(_ text: String) -> some View {
         VStack(alignment: .trailing, spacing: 8) {
@@ -136,7 +159,7 @@ struct ChatBubbleView: View {
                     HStack(spacing: 4) {
                         Image(systemName: isThinkingExpanded ? "chevron.down" : "chevron.right")
                             .font(.system(size: fontSize - 4))
-                        Text(isStreaming && text.isEmpty ? "Thinking..." : "Thoughts")
+                        ThinkingLabel(message: message, live: live)
                             .font(.system(size: fontSize - 1))
                     }
                     .foregroundStyle(.secondary)
@@ -165,9 +188,11 @@ struct ChatBubbleView: View {
                 }
                 .textSelection(.enabled)
             } else if !hasThinking {
-                Text("...")
+                // Pulses so a slow first token, such as while the model loads, doesn't look stuck.
+                Image(systemName: "ellipsis")
                     .font(.system(size: fontSize))
                     .foregroundStyle(.secondary)
+                    .symbolEffect(.variableColor.iterative)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -213,6 +238,29 @@ struct ChatBubbleView: View {
         return marks.count >= 3 && marks.allSatisfy { $0 == mark }
     }
 
+}
+
+// Counts up once a second while the model thinks, then shows how long it took.
+private struct ThinkingLabel: View {
+    let message: ChatMessage
+    let live: LiveReply?
+
+    var body: some View {
+        if let start = live?.thinkingStart, live?.thinkingEnd == nil {
+            TimelineView(.periodic(from: start, by: 1)) { context in
+                Text("Thinking \(Self.format(context.date.timeIntervalSince(start)))")
+            }
+        } else if let seconds = live?.thinkingSeconds ?? message.thinkingSeconds {
+            Text("Thought for \(Self.format(seconds))")
+        } else {
+            // Replies saved before thinking was timed.
+            Text("Thoughts")
+        }
+    }
+
+    private static func format(_ seconds: Double) -> String {
+        Duration.seconds(max(1, seconds.rounded())).formatted(.units(allowed: [.minutes, .seconds], width: .narrow))
+    }
 }
 
 // Reads the thinking in its own view, so only an expanded section updates as it streams.
@@ -277,6 +325,7 @@ private struct MessageImage: View {
     let cacheKey: String
 
     @State private var image: NSImage?
+    @State private var previewURL: URL?
 
     private static let cache = NSCache<NSString, NSImage>()
 
@@ -289,12 +338,16 @@ private struct MessageImage: View {
                     .aspectRatio(contentMode: .fit)
                     .clipShape(.rect(cornerRadius: 8))
                     .frame(maxWidth: 150, maxHeight: 150, alignment: .trailing)
+                    .onTapGesture {
+                        previewURL = quickLookFile(for: data, name: cacheKey)
+                    }
             } else {
                 RoundedRectangle(cornerRadius: 8)
                     .fill(Color.primary.opacity(0.08))
                     .frame(width: 150, height: 150)
             }
         }
+        .quickLookPreview($previewURL)
         .task(id: cacheKey) {
             guard Self.cache.object(forKey: cacheKey as NSString) == nil else {
                 return
@@ -325,6 +378,16 @@ private struct MessageImage: View {
         }
         return NSImage(cgImage: image, size: NSSize(width: image.width / 2, height: image.height / 2))
     }
+}
+
+// Quick Look shows files, so the image is written once to a temporary file with the extension of its format.
+func quickLookFile(for data: Data, name: String) -> URL? {
+    let type = CGImageSourceCreateWithData(data as CFData, nil).flatMap(CGImageSourceGetType).flatMap { UTType($0 as String) }
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(name).appendingPathExtension(type?.preferredFilenameExtension ?? "png")
+    if !FileManager.default.fileExists(atPath: url.path), (try? data.write(to: url)) == nil {
+        return nil
+    }
+    return url
 }
 
 // Splits a reply at blank lines that start a new top-level block outside code fences.

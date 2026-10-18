@@ -89,21 +89,32 @@ final class ChatStreamer {
                 }
                 if !pendingThinking.isEmpty {
                     live.thinking += pendingThinking
-                    // Observation notifies on every set, even of the same value.
-                    if !live.hasThinking {
-                        live.hasThinking = true
-                    }
                 }
                 pendingText = ""
                 pendingThinking = ""
                 lastFlush = .now
             }
 
+            var tokensPerSecond: Double?
+            var tokensUsed: Int?
             var failed = false
             do {
                 for try await chunk in ollamaService.streamConversation(model: modelName, messages: history, think: think) {
-                    pendingText += chunk.content ?? ""
-                    pendingThinking += chunk.thinking ?? ""
+                    pendingText += chunk.message?.content ?? ""
+                    pendingThinking += chunk.message?.thinking ?? ""
+                    // Timed per chunk rather than per flush, and set once each, since Observation notifies on every set.
+                    if chunk.message?.thinking?.isEmpty == false && live.thinkingStart == nil {
+                        live.thinkingStart = .now
+                    }
+                    if chunk.message?.content?.isEmpty == false && live.thinkingStart != nil && live.thinkingEnd == nil {
+                        live.thinkingEnd = .now
+                    }
+                    if let count = chunk.eval_count, let duration = chunk.eval_duration, duration > 0 {
+                        tokensPerSecond = Double(count) / (Double(duration) / 1_000_000_000)
+                    }
+                    if let prompt = chunk.prompt_eval_count, let count = chunk.eval_count {
+                        tokensUsed = prompt + count
+                    }
                     if ContinuousClock.now - lastFlush >= flushInterval {
                         flush()
                     }
@@ -115,12 +126,18 @@ final class ChatStreamer {
                 }
             }
             flush()
+            // A reply stopped while thinking still gets a duration.
+            if live.thinkingStart != nil && live.thinkingEnd == nil {
+                live.thinkingEnd = .now
+            }
 
             // Written in the same update that drops the live reply, so the bubble switches over without a blank frame.
             // The thread may have been deleted while streaming.
             if !reply.isDeleted {
                 reply.text = live.text
                 reply.thinking = live.thinking.isEmpty ? nil : live.thinking
+                reply.tokensPerSecond = tokensPerSecond
+                reply.thinkingSeconds = live.thinkingSeconds
             }
             liveReplies[reply.id] = nil
 
@@ -135,6 +152,17 @@ final class ChatStreamer {
             if !failed && !Task.isCancelled && !thread.isDeleted && !thread.hasReceivedFirstMessage {
                 thread.hasReceivedFirstMessage = true
                 generateTitle(thread, reply: reply, model: model)
+            }
+
+            // In its own task, so the extra request doesn't hold up the end of streaming.
+            if let tokensUsed {
+                Task {
+                    if let total = await ollamaService.fetchContextLength(model: modelName), total > 0, !reply.isDeleted {
+                        reply.contextUsage = Double(tokensUsed) / Double(total)
+                        // The reply was already saved when streaming ended, and autosave can lag.
+                        try? reply.modelContext?.save()
+                    }
+                }
             }
         }
     }
@@ -168,6 +196,19 @@ final class ChatStreamer {
 final class LiveReply {
     var text = ""
     var thinking = ""
-    // Lets a collapsed thinking section depend on this alone, so it skips the update of every thinking flush.
-    var hasThinking = false
+    // Each is set once, when thinking starts and when the answer starts, so the label can count up live.
+    var thinkingStart: Date?
+    var thinkingEnd: Date?
+
+    // Lets a collapsed thinking section depend on the start alone, so it skips the update of every thinking flush.
+    var hasThinking: Bool {
+        thinkingStart != nil
+    }
+
+    var thinkingSeconds: Double? {
+        guard let thinkingStart, let thinkingEnd else {
+            return nil
+        }
+        return thinkingEnd.timeIntervalSince(thinkingStart)
+    }
 }

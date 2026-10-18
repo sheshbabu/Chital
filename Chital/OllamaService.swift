@@ -57,6 +57,10 @@ struct OllamaChatResponse: Decodable {
     let message: OllamaResponseMessage?
     let done: Bool?
     let error: String?
+    // Only on the final chunk. The duration is in nanoseconds.
+    let prompt_eval_count: Int?
+    let eval_count: Int?
+    let eval_duration: Int?
 }
 
 struct OllamaErrorResponse: Decodable {
@@ -69,6 +73,15 @@ struct OllamaModelResponse: Decodable {
 
 struct OllamaModel: Decodable {
     let name: String
+}
+
+struct OllamaRunningResponse: Decodable {
+    let models: [OllamaRunningModel]
+}
+
+struct OllamaRunningModel: Decodable {
+    let name: String
+    let context_length: Int?
 }
 
 struct OllamaShowResponse: Decodable {
@@ -196,7 +209,7 @@ class OllamaService {
         return res.message?.content ?? ""
     }
 
-    func streamConversation(model: String, messages: [OllamaChatMessage], think: String?) -> AsyncThrowingStream<OllamaResponseMessage, Error> {
+    func streamConversation(model: String, messages: [OllamaChatMessage], think: String?) -> AsyncThrowingStream<OllamaChatResponse, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
@@ -220,9 +233,7 @@ class OllamaService {
                         if let error = res.error {
                             throw OllamaError.server(error)
                         }
-                        if let message = res.message {
-                            continuation.yield(message)
-                        }
+                        continuation.yield(res)
                         if res.done == true {
                             break
                         }
@@ -237,6 +248,19 @@ class OllamaService {
                 task.cancel()
             }
         }
+    }
+
+    // The context length the model is loaded with, which Ollama picks from available memory unless the user set one.
+    func fetchContextLength(model: String) async -> Int? {
+        if contextLength > 0 {
+            return contextLength
+        }
+        guard let url = try? endpoint("ps"),
+              let (data, _) = try? await URLSession.shared.data(from: url),
+              let res = try? JSONDecoder().decode(OllamaRunningResponse.self, from: data) else {
+            return nil
+        }
+        return res.models.first { $0.name == model }?.context_length
     }
 
     func fetchModels() async throws -> [OllamaModelInfo] {

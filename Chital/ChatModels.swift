@@ -34,6 +34,12 @@ final class ChatMessage: Identifiable {
     var id: UUID
     var text: String
     var thinking: String?
+    // Nil for user messages, stopped or failed replies, and replies saved before this was tracked.
+    var tokensPerSecond: Double?
+    // The share of the model's context used by the prompt and this reply, from 0 to 1, with the same nil cases.
+    var contextUsage: Double?
+    // Nil for replies without thinking and replies saved before this was tracked.
+    var thinkingSeconds: Double?
     var isUser: Bool
     var createdAt: Date
     @Attribute(.externalStorage) var images: [Data]?
