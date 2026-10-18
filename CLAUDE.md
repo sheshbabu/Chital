@@ -25,4 +25,4 @@ All source is flat in `Chital/`:
 - Keep it lean. Avoid new dependencies; the small binary and fast launch are features.
 
 ## Release
-Bump `MARKETING_VERSION` in `project.pbxproj`, then Xcode > Product > Archive > Distribute App > Custom > Copy App, and attach to a GitHub release.
+Run `/release` (`.claude/skills/release/SKILL.md`). It bumps `MARKETING_VERSION`, commits the bump, archives and copies the app to Downloads (the same as Xcode's Distribute App > Custom > Copy App), and drafts release notes. Then tag, push and attach the app to a GitHub release.
