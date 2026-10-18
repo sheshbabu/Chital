@@ -10,6 +10,8 @@ final class ChatStreamer {
     @ObservationIgnored @AppStorage("systemPrompt") private var systemPrompt = AppConstants.systemPrompt
 
     private(set) var streamingThreadIDs: Set<UUID> = []
+    // Streaming replies by message ID, kept out of SwiftData until they end, since every SwiftData write invalidates every view that uses SwiftData.
+    private(set) var liveReplies: [UUID: LiveReply] = [:]
     // The last failure per thread, shown inline at the end of that thread until the next send.
     private(set) var errors: [UUID: String] = [:]
 
@@ -26,6 +28,10 @@ final class ChatStreamer {
 
     func error(for thread: ChatThread) -> String? {
         errors[thread.id]
+    }
+
+    func liveReply(for message: ChatMessage) -> LiveReply? {
+        liveReplies[message.id]
     }
 
     func stop(_ thread: ChatThread) {
@@ -63,6 +69,8 @@ final class ChatStreamer {
 
         let threadID = thread.id
         streamingThreadIDs.insert(threadID)
+        let live = LiveReply()
+        liveReplies[reply.id] = live
 
         tasks[threadID] = Task {
             defer {
@@ -76,15 +84,15 @@ final class ChatStreamer {
             var lastFlush = ContinuousClock.now
 
             func flush() {
-                // The thread may have been deleted while streaming.
-                guard !reply.isDeleted else {
-                    return
-                }
                 if !pendingText.isEmpty {
-                    reply.text += pendingText
+                    live.text += pendingText
                 }
                 if !pendingThinking.isEmpty {
-                    reply.thinking = (reply.thinking ?? "") + pendingThinking
+                    live.thinking += pendingThinking
+                    // Observation notifies on every set, even of the same value.
+                    if !live.hasThinking {
+                        live.hasThinking = true
+                    }
                 }
                 pendingText = ""
                 pendingThinking = ""
@@ -107,6 +115,14 @@ final class ChatStreamer {
                 }
             }
             flush()
+
+            // Written in the same update that drops the live reply, so the bubble switches over without a blank frame.
+            // The thread may have been deleted while streaming.
+            if !reply.isDeleted {
+                reply.text = live.text
+                reply.thinking = live.thinking.isEmpty ? nil : live.thinking
+            }
+            liveReplies[reply.id] = nil
 
             // A cancelled stream ends without throwing, so this runs for Stop as well as for errors.
             // An empty reply bubble is useless, and removing it lets the user retry from their message.
@@ -146,4 +162,12 @@ final class ChatStreamer {
             }
         }
     }
+}
+
+@Observable
+final class LiveReply {
+    var text = ""
+    var thinking = ""
+    // Lets a collapsed thinking section depend on this alone, so it skips the update of every thinking flush.
+    var hasThinking = false
 }

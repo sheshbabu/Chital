@@ -63,7 +63,7 @@ struct ContentView: View {
     }
 }
 
-// Owns the threads query, which updates on every change to any model, including each streamed token.
+// Owns the threads query, which updates on every change to any model.
 // Keeping it here means those updates re-run only the sidebar, not the whole window and the open thread.
 struct ThreadSidebar: View {
     @Binding var selection: ChatThread?

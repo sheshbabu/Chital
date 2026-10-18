@@ -4,6 +4,8 @@ import ImageIO
 
 struct ChatBubbleView: View {
     let message: ChatMessage
+    // Set while the reply streams, and read instead of the message so only this bubble updates on each flush.
+    let live: LiveReply?
     let isStreaming: Bool
     let canRetry: Bool
     let canEdit: Bool
@@ -17,6 +19,14 @@ struct ChatBubbleView: View {
     @State private var editText: String?
     @State private var chunker = MarkdownChunker()
     @FocusState private var isEditorFocused: Bool
+
+    private var text: String {
+        live?.text ?? message.text
+    }
+
+    private var hasThinking: Bool {
+        live?.hasThinking ?? !(message.thinking ?? "").isEmpty
+    }
     
     var body: some View {
         VStack(alignment: message.isUser ? .trailing : .leading, spacing: 4) {
@@ -29,7 +39,7 @@ struct ChatBubbleView: View {
             }
             
             // Always laid out so spacing doesn't jump while streaming, and revealed on hover except for a failed message's retry.
-            let canShowActions = message.text != "" && !isStreaming && editText == nil
+            let canShowActions = text != "" && !isStreaming && editText == nil
             HStack(spacing: 4) {
                 CopyButton(text: message.text)
                 if message.isUser && canEdit {
@@ -120,13 +130,13 @@ struct ChatBubbleView: View {
     // Replies are plain text across the full column so code blocks and tables have room.
     private var assistantContent: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if let thinking = message.thinking, !thinking.isEmpty {
+            if hasThinking {
                 // A plain button instead of DisclosureGroup, which on macOS only toggles from its small triangle.
                 Button(action: { isThinkingExpanded.toggle() }) {
                     HStack(spacing: 4) {
                         Image(systemName: isThinkingExpanded ? "chevron.down" : "chevron.right")
                             .font(.system(size: fontSize - 4))
-                        Text(isStreaming && message.text.isEmpty ? "Thinking..." : "Thoughts")
+                        Text(isStreaming && text.isEmpty ? "Thinking..." : "Thoughts")
                             .font(.system(size: fontSize - 1))
                     }
                     .foregroundStyle(.secondary)
@@ -135,24 +145,13 @@ struct ChatBubbleView: View {
                 .buttonStyle(.plain)
                 
                 if isThinkingExpanded {
-                    // A quote-style rule sets the reasoning apart from the answer below it.
-                    // Apple's inline Markdown parser is much faster than MarkdownUI for long reasoning, and keeps line breaks for lists.
-                    Text(Self.inlineMarkdown(thinking))
-                        .font(.system(size: fontSize - 1))
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                        .padding(.leading, 10)
-                        .overlay(alignment: .leading) {
-                            Rectangle()
-                                .fill(Color.secondary.opacity(0.4))
-                                .frame(width: 2)
-                        }
+                    ThinkingText(message: message, live: live, fontSize: fontSize)
                 }
             }
             
-            if !message.text.isEmpty {
+            if !text.isEmpty {
                 // Separate Markdown views per top-level block group, so a streaming reply only re-renders its last part.
-                let chunks = chunker.chunks(for: message.text)
+                let chunks = chunker.chunks(for: text)
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(chunks.indices, id: \.self) { index in
                         MarkdownChunk(text: chunks[index])
@@ -165,7 +164,7 @@ struct ChatBubbleView: View {
                     FontSize(fontSize)
                 }
                 .textSelection(.enabled)
-            } else if message.thinking == nil {
+            } else if !hasThinking {
                 Text("...")
                     .font(.system(size: fontSize))
                     .foregroundStyle(.secondary)
@@ -214,11 +213,33 @@ struct ChatBubbleView: View {
         return marks.count >= 3 && marks.allSatisfy { $0 == mark }
     }
 
+}
+
+// Reads the thinking in its own view, so only an expanded section updates as it streams.
+private struct ThinkingText: View {
+    let message: ChatMessage
+    let live: LiveReply?
+    let fontSize: Double
+
+    var body: some View {
+        // A quote-style rule sets the reasoning apart from the answer below it.
+        // Apple's inline Markdown parser is much faster than MarkdownUI for long reasoning, and keeps line breaks for lists.
+        Text(Self.inlineMarkdown(live?.thinking ?? message.thinking ?? ""))
+            .font(.system(size: fontSize - 1))
+            .foregroundStyle(.secondary)
+            .textSelection(.enabled)
+            .padding(.leading, 10)
+            .overlay(alignment: .leading) {
+                Rectangle()
+                    .fill(Color.secondary.opacity(0.4))
+                    .frame(width: 2)
+            }
+    }
+
     private static func inlineMarkdown(_ text: String) -> AttributedString {
         let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
         return (try? AttributedString(markdown: text, options: options)) ?? AttributedString(text)
     }
-    
 }
 
 private struct CodeBlock: View {
@@ -437,6 +458,7 @@ struct ChatBubbleButton: View {
                 isUser: true,
                 timestamp: Date()
             ),
+            live: nil,
             isStreaming: false,
             canRetry: true,
             canEdit: true,
@@ -451,6 +473,7 @@ struct ChatBubbleButton: View {
                 isUser: false,
                 timestamp: Date()
             ),
+            live: nil,
             isStreaming: false,
             canRetry: true,
             canEdit: false,

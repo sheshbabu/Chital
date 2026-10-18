@@ -12,11 +12,23 @@ struct ChatThreadView: View {
     // Whether the end of the conversation is on screen, so streaming only follows when the user hasn't scrolled up.
     @State private var isAtBottom = true
     @State private var exportDocument: MarkdownDocument?
+    // Only recent messages are laid out until asked, since the eager list lays out every message on each update.
+    @State private var showsAllMessages = false
+    // Kept here while typing, since writing it to the thread on every keystroke would invalidate every SwiftData view.
+    @State private var draft: String
     @FocusState private var isInputFocused: Bool
 
     let availableModels: [OllamaModelInfo]
     let onFirstMessage: () -> Void
     let onSelectThread: (ChatThread) -> Void
+
+    init(thread: ChatThread, availableModels: [OllamaModelInfo], onFirstMessage: @escaping () -> Void, onSelectThread: @escaping (ChatThread) -> Void) {
+        self.thread = thread
+        self.availableModels = availableModels
+        self.onFirstMessage = onFirstMessage
+        self.onSelectThread = onSelectThread
+        _draft = State(initialValue: thread.draft ?? "")
+    }
 
     var body: some View {
         let messages = thread.chronologicalMessages
@@ -29,10 +41,7 @@ struct ChatThreadView: View {
                 isStreaming: isStreaming,
                 onSubmit: insertChatMessage,
                 onStop: { streamer.stop(thread) },
-                text: Binding(
-                    get: { thread.draft ?? "" },
-                    set: { thread.draft = $0.isEmpty ? nil : $0 }
-                ),
+                text: $draft,
                 selectedModel: Binding(
                     get: { thread.selectedModel ?? "" },
                     set: { thread.selectedModel = $0 }
@@ -48,6 +57,15 @@ struct ChatThreadView: View {
         .onAppear(perform: ensureModelSelected)
         .onChange(of: availableModels) {
             ensureModelSelected()
+        }
+        // The view is replaced on thread switch, and the other two cover leaving the app and quitting it.
+        .onDisappear(perform: saveDraft)
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willResignActiveNotification)) { _ in
+            saveDraft()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+            saveDraft()
+            try? context.save()
         }
         .focusedSceneValue(\.threadActions, ThreadActions(
             isStreaming: isStreaming,
@@ -73,14 +91,28 @@ struct ChatThreadView: View {
     }
 
     private func messageList(_ messages: [ChatMessage], isStreaming: Bool) -> some View {
-        ScrollViewReader { proxy in
+        let shownMessages = showsAllMessages ? messages : Array(messages.suffix(recentMessageLimit))
+
+        return ScrollViewReader { proxy in
             ScrollView(.vertical) {
                 // Eager rather than lazy, since lazy rows get estimated heights and scrollTo can then loop forever on replies taller than the window.
                 VStack(alignment: .leading, spacing: 12) {
-                    ForEach(messages) { message in
+                    if let firstShown = shownMessages.first, shownMessages.count < messages.count {
+                        Button("Show \(messages.count - shownMessages.count) Earlier Messages") {
+                            showsAllMessages = true
+                            // The earlier messages appear above, so this keeps the view in place instead of jumping to the start.
+                            Task { @MainActor in
+                                proxy.scrollTo(firstShown.id, anchor: .top)
+                            }
+                        }
+                        .buttonStyle(.link)
+                        .frame(maxWidth: .infinity)
+                    }
+                    ForEach(shownMessages) { message in
                         let isLast = message.id == messages.last?.id
                         ChatBubbleView(
                             message: message,
+                            live: streamer.liveReply(for: message),
                             isStreaming: isStreaming && isLast,
                             canRetry: !isStreaming && isLast,
                             canEdit: !isStreaming && message.isUser,
@@ -88,6 +120,7 @@ struct ChatThreadView: View {
                             onEdit: { edit(message, text: $0) },
                             onFork: { fork(at: message) }
                         )
+                        .id(message.id)
                     }
                     if let error = streamer.error(for: thread) {
                         ErrorRow(message: error) {
@@ -96,7 +129,7 @@ struct ChatThreadView: View {
                             }
                         }
                     }
-                    StreamFollower(message: messages.last, isFollowing: isAtBottom) {
+                    StreamFollower(reply: messages.last.flatMap(streamer.liveReply(for:)), isFollowing: isAtBottom) {
                         proxy.scrollTo(bottomId, anchor: nil)
                     }
                     .id(bottomId)
@@ -161,6 +194,7 @@ struct ChatThreadView: View {
         }
     }
 
+    private let recentMessageLimit = 10
     private let bottomId = "bottom"
     private let scrollSpace = "chatScroll"
 
@@ -174,6 +208,13 @@ struct ChatThreadView: View {
         }
         let defaultModel = availableModels.first { $0.name == defaultModelName }
         thread.selectedModel = (defaultModel ?? availableModels.first)?.name
+    }
+
+    private func saveDraft() {
+        let value = draft.isEmpty ? nil : draft
+        if thread.draft != value {
+            thread.draft = value
+        }
     }
 
     private func insertChatMessage(text: String, images: [Data]) {
@@ -273,13 +314,13 @@ struct ChatThreadView: View {
 
 // Follows a streaming reply to the bottom, in its own view so the per-token text changes only re-render this, not the whole thread.
 private struct StreamFollower: View {
-    let message: ChatMessage?
+    let reply: LiveReply?
     let isFollowing: Bool
     let scrollToBottom: () -> Void
 
     var body: some View {
         // UTF-8 counts are constant time, unlike counting characters.
-        let length = (message?.text.utf8.count ?? 0) + (message?.thinking?.utf8.count ?? 0)
+        let length = (reply?.text.utf8.count ?? 0) + (reply?.thinking.utf8.count ?? 0)
         Color.clear
             .frame(height: 1)
             .onChange(of: length) {
